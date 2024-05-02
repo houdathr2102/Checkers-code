@@ -1,0 +1,652 @@
+#include <iostream>
+#include<iomanip>
+#include <cstdlib>
+#include <ctime>
+using namespace std;
+class Board{
+private:
+    string ** board;
+public:
+    // declare the board
+    Board(){
+        board =new string*[8];
+        for(int i=0;i<8;i++){
+            board[i]=new string[8];
+        }
+        initialization();}
+    // destructor of the board
+~Board(){
+        for (int i = 0; i<8; ++i) {
+                delete[] board[i];
+            }
+            delete[] board;
+        }
+    //GETTER:
+    string getPiece(int row, int col) {
+        return board[row][col];
+    }
+    //SETTER:
+    void setPiece(int row, int col, string piece) {
+        board[row][col] = piece;
+    }
+    // TO UPDATE THE PIECE
+    void updatePiece(int row, int col, int row2, int col2) {
+        board[row2][col2] = board[row][col];
+        board[row][col] = ".";
+    }
+    
+    // INITIAL BOARD:
+    void initialization() {
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 8; j++) {
+                if ((j + i) % 2 == 0)
+                    board[i][j] = ".";
+                else
+                    board[i][j] = "W";
+            }
+        }
+        for (int i = 3; i < 5; i++) {
+            for (int j = 0; j < 8; j++) {
+                board[i][j] = ".";
+            }
+        }
+        for (int i = 5; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                if ((j + i) % 2 == 0)
+                    board[i][j] = ".";
+                else
+                    board[i][j] = "B";
+            }
+        }
+    }
+};
+class Game {
+private:
+    int capturedPlayerPieces = 0;
+    int capturedComputerPieces = 0;
+    int fromRow, fromCol, toRow, toCol;
+    Board board;
+public:
+    friend class Computer;
+    friend class Player;
+    
+    //PRINT THE BOARD:
+    void printBoard() {
+        cout << "      0    1    2    3    4    5    6    7" << endl;
+        cout << " ----------------------------------------------" << endl;
+        for (int i = 0; i < 8; i++) {
+            cout << i << "|  ";
+            for (int j = 0; j < 8; j++) {
+                cout << setw(3) << board.getPiece(i, j) << "  ";
+            }
+            cout << "  |" << endl;
+        }
+        cout << " -----------------------------------------------" << endl;
+    }
+    
+    //CHECK IF A PIECE CAN BE A KING OR NOT
+    bool PieceBecomesKing(int fromRow, int fromCol, int toRow, int toCol) {
+        if (board.getPiece(fromRow, fromCol) == "W" && toRow == 7) {
+            board.setPiece(toRow, toCol, "KW");
+            board.setPiece(fromRow, fromCol, ".");
+            return true;
+        }
+        else if (board.getPiece(fromRow, fromCol) == "B" && toRow == 0) {
+            board.setPiece(toRow, toCol, "KB");
+            board.setPiece(fromRow, fromCol, ".");
+            return true;
+        }
+        return false;
+    }
+    
+    //CHECK IF AN EXISTING PIECE IS A KING
+    bool PieceIsKing(int fromRow, int fromCol, int toRow, int toCol) {
+        if (board.getPiece(fromRow, fromCol) == "KW" || board.getPiece(fromRow, fromCol) == "KB") {
+            return true;
+        }
+        return false;
+    }
+    // CHECK IF A KING CAN MOVE OR NOT
+    bool KINGVALIDMOVE(int fromRow, int fromCol, int toRow, int toCol) {
+        // Check if the move is within the board bounds
+        if (fromRow < 0 || fromRow >= 8 || fromCol < 0 || fromCol >= 8 || toRow < 0 || toRow >= 8 || toCol < 0 || toCol >= 8) {
+            return false;
+        }
+        // if the initial square is empty
+        if(board.getPiece(fromRow, fromCol)== "."){
+            return false;
+        }
+        // Check if the destination square is empty
+        if (board.getPiece(toRow, toCol) != ".") {
+            return false;
+        }
+        // Check if the move is diagonal and one square away
+        if (abs(fromRow - toRow) != 1 || abs(fromCol - toCol) != 1) {
+            return false;
+        }
+        // if not the move is valid
+        return true;
+    }
+    //CHECK IF A KING CAN CAPTURE
+    bool KINGCaptureCheck(int row, int col) {
+        // KING PLAYER CAN CAPTURE ?
+        if (board.getPiece(row, col) == "KB") {
+            // Check if there's a capture opportunity diagonally forward right
+            if (row >= 2 && row <= 7 && col >= 0 && col <= 5 && (board.getPiece(row - 1, col + 1) == "W" || board.getPiece(row - 1, col + 1) == "KW") && board.getPiece(row - 2, col + 2) == ".") {
+                return true;
+            }
+            // Check if there's a capture opportunity diagonally forward left
+            else if (row >= 2 && row <= 7 && col >= 2 && col <= 7 && (board.getPiece(row - 1, col - 1) == "W" || board.getPiece(row - 1, col - 1) == "KW") && board.getPiece(row - 2, col - 2) == ".") {
+                return true;
+            }
+            // Check if there's a capture opportunity diagonally backward left
+            else if (row >= 0 && row <= 5 && col >= 2 && col <= 7 && (board.getPiece(row + 1, col - 1) == "W" || board.getPiece(row + 1, col - 1) == "KW") && board.getPiece(row + 2, col - 2) == ".") {
+                return true;
+            }
+            // Check if there's a capture opportunity diagonally backward right
+            else if (row >= 0 && row <= 5 && col >= 0 && col <= 5 && (board.getPiece(row + 1, col + 1) == "W" || board.getPiece(row + 1, col + 1) == "KW") && board.getPiece(row + 2, col + 2) == ".") {
+                return true;
+            }
+        }
+        // KING COMPUTER CAN CAPTURE ?
+        else if (board.getPiece(row, col) == "KW") {
+            // Check if there's a capture opportunity diagonally forward right
+            if (row >= 0 && row <= 5 && col >= 0 && col <= 5 && (board.getPiece(row + 1, col + 1) == "B" || board.getPiece(row + 1, col + 1) == "KB") && board.getPiece(row + 2, col + 2) == ".") {
+                return true;
+            }
+            // Check if there's a capture opportunity diagonally forward left
+            else if (row >= 0 && row <= 5 && col >= 2 && col <= 7 && (board.getPiece(row + 1, col - 1) == "B" || board.getPiece(row + 1, col - 1) == "KB") && board.getPiece(row + 2, col - 2) == ".") {
+                return true;
+            }
+            // Check if there's a capture opportunity diagonally backward left
+            if (row >= 2 && row <= 7 && col >= 2 && col <= 7 && (board.getPiece(row - 1, col - 1) == "B" || board.getPiece(row - 1, col - 1) == "KB") && board.getPiece(row - 2, col - 2) == ".") {
+                return true;
+            }
+            // Check if there's a capture opportunity diagonally backward right
+            else if (row >= 2 && row <= 7 && col >= 0 && col <= 5 && (board.getPiece(row - 1, col + 1) == "B" || board.getPiece(row - 1, col + 1) == "KB") && board.getPiece(row - 2, col + 2) == ".") {
+                return true;
+            }
+        }
+        return false;
+    }
+    // KING PIECES CAPTURE+ COUNTER FOR THE CAPTURED PIECES
+    bool KINGCapture(int row, int col) {
+        //PLAYER
+        if (board.getPiece(row, col) == "KB") {
+            //  diagonally forward right
+            if (row >= 2 && row <= 7 && col >= 0 && col <= 5 && (board.getPiece(row - 1, col + 1) == "W" || board.getPiece(row - 1, col + 1) == "KW") && board.getPiece(row - 2, col + 2) == ".") {
+                cout << "You took the Capture Opportunity !!! " << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row - 1, col + 1, "."); // Empty captured piece
+                board.setPiece(row - 2, col + 2, "KB"); // Place player's piece after capture
+                this->capturedComputerPieces++;
+                cout << " captured computer pieces: " << this->capturedComputerPieces << endl;
+                return true;
+            }
+            //  diagonally forward left
+            else if (row >= 2 && row <= 7 && col >= 2 && col <= 7 && (board.getPiece(row - 1, col - 1) == "W" || board.getPiece(row - 1, col - 1) == "KW") && board.getPiece(row - 2, col - 2) == ".") {
+                cout << "You took the Capture Opportunity !!! " << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row - 1, col - 1, "."); // Empty captured piece
+                board.setPiece(row - 2, col - 2, "KB"); // Place player's piece after capture
+                this->capturedComputerPieces++;
+                cout << " captured computer pieces: " << this->capturedComputerPieces << endl;
+                return true;
+            }
+            //  diagonally backward left
+            else if (row >= 0 && row <= 5 && col >= 2 && col <= 7 && (board.getPiece(row + 1, col - 1) == "W" || board.getPiece(row + 1, col - 1) == "KW") && board.getPiece(row + 2, col - 2) == ".") {
+                cout << "You took the Capture Opportunity !!! " << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row + 1, col - 1, "."); // Empty captured piece
+                board.setPiece(row + 2, col - 2, "KB"); // Place player's piece after capture
+                this->capturedComputerPieces++;
+                cout << " captured computer pieces: " << this->capturedComputerPieces << endl;
+                return true;
+            }
+            //  diagonally backward right
+            else if (row >= 0 && row <= 5 && col >= 0 && col <= 5 && (board.getPiece(row + 1, col + 1) == "W" || board.getPiece(row + 1, col + 1) == "KW") && board.getPiece(row + 2, col + 2) == ".") {
+                cout << "You took the Capture Opportunity !!! " << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row + 1, col + 1, "."); // Empty captured piece
+                board.setPiece(row + 2, col + 2, "KB"); // Place player's piece after capture
+                this->capturedComputerPieces++;
+                cout << " captured computer pieces: " << this->capturedComputerPieces << endl;
+                return true;
+            }
+        }
+        else if (board.getPiece(row, col) == "KW") {
+            //  diagonally forward right
+            if (row >= 0 && row <= 5 && col >= 0 && col <= 5 && (board.getPiece(row + 1, col + 1) == "B" || board.getPiece(row + 1, col + 1) == "KB") && board.getPiece(row + 2, col + 2) == ".") {
+                cout << "The computer has a Capture Opportunity: " << row << " " << col << "to " << row + 2 << " " << col + 2 << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row + 1, col + 1, "."); // Empty captured piece
+                board.setPiece(row + 2, col + 2, "KW"); // Place computer's piece after capture
+                this->capturedPlayerPieces++;
+                cout << "captured player pieces: " << this->capturedPlayerPieces << endl;
+                return true;
+            }
+            //  diagonally forward left
+            else if (row >= 0 && row <= 5 && col >= 2 && col <= 7 && (board.getPiece(row + 1, col - 1) == "B" || board.getPiece(row + 1, col - 1) == "KB") && board.getPiece(row + 2, col - 2) == ".") {
+                cout << "The computer has a Capture Opportunity: " << row << " " << col << "to " << row + 2 << " " << col - 2 << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row + 1, col - 1, "."); // Empty captured piece
+                board.setPiece(row + 2, col - 2, "KW"); // Place computer's piece after capture
+                this->capturedPlayerPieces++;
+                cout << "captured player pieces: " << this->capturedPlayerPieces << endl;
+                return true;
+            }
+            //  diagonally backward left
+            if (row >= 2 && row <= 7 && col >= 2 && col <= 7 && (board.getPiece(row - 1, col - 1) == "B" || board.getPiece(row - 1, col - 1) == "KB") && board.getPiece(row - 2, col - 2) == ".") {
+                cout << "The computer has a Capture Opportunity: " << row << " " << col << "to " << row - 1 << " " << col - 1 << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row - 1, col - 1, "."); // Empty captured piece
+                board.setPiece(row - 2, col - 2, "KW"); // Place computer's piece after capture
+                this->capturedPlayerPieces++;
+                cout << "captured player pieces: " << this->capturedPlayerPieces << endl;
+                return true;
+            }
+            //  diagonally backward right
+            else if (row >= 2 && row <= 7 && col >= 0 && col <= 5 && (board.getPiece(row - 1, col + 1) == "B" || board.getPiece(row - 1, col + 1) == "KB") && board.getPiece(row - 2, col + 2) == ".") {
+                cout << "The computer has a Capture Opportunity: " << row << " " << col << "to " << row - 2 << " " << col + 2 << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row - 1, col + 1, "."); // Empty captured piece
+                board.setPiece(row - 2, col + 2, "KW"); // Place computer's piece after capture
+                this->capturedPlayerPieces++;
+                cout << "captured player pieces: " << this->capturedPlayerPieces << endl;
+                return true;
+            }
+        }
+        return false;
+    }
+    //CHECK IF THE MOVE IS VALID OR NOT
+    bool VALIDMOVE(int fromRow, int fromCol, int toRow, int toCol) {
+        // Check if the move is within the board bounds
+        if (fromRow < 0 || fromRow >= 8 || fromCol < 0 || fromCol >= 8 || toRow < 0 || toRow >= 8 || toCol < 0 || toCol >= 8) {
+            return false;
+        }
+        // if the initial square is empty
+        if(board.getPiece(fromRow, fromCol)=="."){
+            return false;
+        }
+            
+        // Check if the destination square is empty
+        if (board.getPiece(toRow, toCol) != ".") {
+            return false;
+        }
+        // Check if the move is diagonal and one square away
+        if (abs(fromRow - toRow) != 1 || abs(fromCol - toCol) != 1) {
+            return false;
+        }
+        // Regular piece (black player) can only move upwards
+        if (board.getPiece(fromRow, fromCol) == "B" && toRow > fromRow) {
+            return false;
+        }
+        // Regular piece (white player) can only move downward
+        if (board.getPiece(fromRow, fromCol) == "W" && toRow < fromRow) {
+            return false;
+        }
+        return true;
+    }
+    // MOVE THE PIECES
+    void MakeMove(int fromRow, int fromCol, int toRow, int toCol) {
+        if (VALIDMOVE(fromRow, fromCol, toRow, toCol)) {
+            board.updatePiece(fromRow, fromCol, toRow, toCol);
+            board.setPiece(fromRow, fromCol, ".");
+        }
+        else if (!VALIDMOVE(fromRow, fromCol, toRow, toCol) && !CaptureCheck(fromRow, fromCol) && !PieceBecomesKing(fromRow, fromCol, toRow, toCol) && !PieceIsKing(fromRow, fromCol, toRow, toCol)) {
+            cout << " " << endl;
+        }
+    }
+    // CHECK IF A PIECE CAN CAPTURE
+    bool CaptureCheck(int row, int col) {
+        if (board.getPiece(row, col) == "B") {
+            // Check if there's a capture opportunity diagonally forward right
+            if (row >= 2 && row <= 7 && col >= 0 && col <= 5 && (board.getPiece(row - 1, col + 1) == "W" || board.getPiece(row - 1, col + 1) == "KW") && board.getPiece(row - 2, col + 2) == ".") {
+                return true;
+            }
+            // Check if there's a capture opportunity diagonally forward left
+            else if (row >= 2 && row <= 7 && col >= 2 && col <= 7 && (board.getPiece(row - 1, col - 1) == "W" || board.getPiece(row - 1, col - 1) == "KW") && board.getPiece(row - 2, col - 2) == ".") {
+                return true;
+            }
+        }
+        else if (board.getPiece(row, col) == "W") {
+            // Check if there's a capture opportunity diagonally backward left
+            if (row >= 0 && row <= 5 && col >= 2 && col <= 7 && (board.getPiece(row + 1, col - 1) == "B" || board.getPiece(row + 1, col - 1) == "KB") && board.getPiece(row + 2, col - 2) == ".") {
+                return true;
+            }
+            // Check if there's a capture opportunity diagonally backward right
+            else if (row >= 0 && row <= 5 && col >= 0 && col <= 5 && (board.getPiece(row + 1, col + 1) == "B" || board.getPiece(row + 1, col + 1) == "KB") && board.getPiece(row + 2, col + 2) == ".") {
+                return true;
+            }
+        }
+        return false;
+    }
+    // PIECE CAPTURES
+    bool Capture(int row, int col) {
+        if (board.getPiece(row, col) == "B") {
+            //  diagonally forward right
+            if (row >= 3 && row <= 7 && col >= 0 && col <= 5 && (board.getPiece(row - 1, col + 1) == "W" || board.getPiece(row - 1, col + 1) == "KW") && board.getPiece(row - 2, col + 2) == ".") {
+                cout << "You took the Capture Opportunity !!! " << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row - 1, col + 1, "."); // Empty captured piece
+                board.setPiece(row - 2, col + 2, "B"); // Place player's piece after capture
+                this->capturedComputerPieces++;
+                cout << " player captured " << this->capturedComputerPieces << " pieces " << endl;
+                return true;
+            }
+            else if (row >= 3 && row <= 7 && col >= 2 && col <= 7 && (board.getPiece(row - 1, col - 1) == "W" || board.getPiece(row - 1, col - 1) == "KW") && board.getPiece(row - 2, col - 2) == ".") {
+                cout << "You took the Capture Opportunity !!! " << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row - 1, col - 1, "."); // Empty captured piece
+                board.setPiece(row - 2, col - 2, "B"); // Place player's piece after capture
+                this->capturedComputerPieces++;
+                cout << " player captured " << this->capturedComputerPieces << " pieces " << endl;
+                return true;
+            }
+            else if (row == 2 && col >= 0 && col <= 5 && (board.getPiece(row - 1, col + 1) == "W" || board.getPiece(row - 1, col + 1) == "KW") && board.getPiece(row - 2, col + 2) == ".")
+            {
+                cout << "You took the Capture Opportunity !!! " << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row - 1, col + 1, "."); // Empty captured piece
+                board.setPiece(row - 2, col + 2, "KB"); // Place player's piece after capture
+                this->capturedComputerPieces++;
+                cout << " player captured " << this->capturedComputerPieces << " pieces " << endl;
+                return true;
+            }
+            else if (row == 2 && col >= 2 && col <= 7 && (board.getPiece(row - 1, col - 1) == "W" || board.getPiece(row - 1, col - 1) == "KW") && board.getPiece(row - 2, col - 2) == ".") {
+                cout << "You took the Capture Opportunity !!! " << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row - 1, col - 1, "."); // Empty captured piece
+                board.setPiece(row - 2, col - 2, "KB"); // Place player's piece after capture
+                this->capturedComputerPieces++;
+                cout << " player captured " << this->capturedComputerPieces << " pieces " << endl;
+                return true;
+            }
+        }
+        else if (board.getPiece(row, col) == "W") {
+            //  diagonally backward left
+            if (row >= 0 && row <= 4 && col >= 2 && col <= 7 && (board.getPiece(row + 1, col - 1) == "B" || board.getPiece(row + 1, col - 1) == "KB") && board.getPiece(row + 2, col - 2) == ".") {
+                cout << "The computer has a Capture Opportunity: " << row << " " << col << " to " << row + 2 << " " << col - 2 << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row + 1, col - 1, "."); // Empty captured piece
+                board.setPiece(row + 2, col - 2, "W"); // Place computer's piece after capture
+                this->capturedPlayerPieces++;
+                cout << "Computer captured " << this->capturedPlayerPieces << " pieces " << endl;
+                return true;
+            }
+            //  diagonally backward right
+            else if (row >= 0 && row <= 4 && col >= 0 && col <= 5 && (board.getPiece(row + 1, col + 1) == "B" || board.getPiece(row + 1, col + 1) == "KB") && board.getPiece(row + 2, col + 2) == ".") {
+                cout << "The computer has a Capture Opportunity: " << row << " " << col << " to " << row + 2 << " " << col + 2 << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row + 1, col + 1, "."); // Empty captured piece
+                board.setPiece(row + 2, col + 2, "W"); // Place computer's piece after capture
+                this->capturedPlayerPieces++;
+                cout << "Computer captured " << this->capturedPlayerPieces << " pieces " << endl;
+                return true;
+            }
+            else if (row == 5 && col >= 2 && col <= 7 && (board.getPiece(row + 1, col - 1) == "B" || board.getPiece(row + 1, col - 1) == "KB") && board.getPiece(row + 2, col - 2) == ".") {
+                cout << "The computer has a Capture Opportunity: " << row << " " << col << " to " << row + 2 << " " << col - 2 << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row + 1, col - 1, "."); // Empty captured piece
+                board.setPiece(row + 2, col - 2, "KW"); // Place computer's piece after capture
+                this->capturedPlayerPieces++;
+                cout << "Computer captured " << this->capturedPlayerPieces << " pieces " << endl;
+                return true;
+            }
+            //  diagonally backward right
+            else if (row == 5 && col >= 0 && col <= 5 && (board.getPiece(row + 1, col + 1) == "B" || board.getPiece(row + 1, col + 1) == "KB") && board.getPiece(row + 2, col + 2) == ".") {
+                cout << "The computer has a Capture Opportunity: " << row << " " << col << " to " << row + 2 << " " << col + 2 << endl;
+                board.setPiece(row, col, "."); // Empty current position
+                board.setPiece(row + 1, col + 1, "."); // Empty captured piece
+                board.setPiece(row + 2, col + 2, "KW"); // Place computer's piece after capture
+                this->capturedPlayerPieces++;
+                cout << "Computer captured " << this->capturedPlayerPieces << " pieces " << endl;
+                return true;
+            }
+        }
+        return false;
+    }
+    //CHECK IF THE GAME ENDS
+    bool IsEndGame()
+    {
+        bool playerHasMove = false;
+        bool computerHasMove = false;
+        // Check if the player has any valid moves or capture opportunities
+        for (int i = 0; i < 8; ++i) {
+            for (int j = 0; j < 8; ++j) {
+                if (board.getPiece(i, j) == "W")
+                {
+                    if (CaptureCheck(i, j) || VALIDMOVE(i, j, i + 1, j + 1) || VALIDMOVE(i, j, i + 1, j - 1))
+                    {
+                        computerHasMove = true;
+                    }
+                }
+                if (board.getPiece(i, j) == "KW")
+                {
+                    if (KINGCaptureCheck(i, j) || KINGVALIDMOVE(i, j, i + 1, j + 1) || KINGVALIDMOVE(i, j, i + 1, j - 1) || KINGVALIDMOVE(i, j, i - 1, j + 1) || KINGVALIDMOVE(i, j, i - 1, j - 1)) {
+                        computerHasMove = true;
+                    }
+                }
+            }
+        }
+        // Check if the computer has any valid moves or capture opportunities
+        for (int i = 0; i < 8; ++i)
+        {
+            for (int j = 0; j < 8; ++j)
+            {
+                if (board.getPiece(i, j) == "B")
+                {
+                    if (CaptureCheck(i, j) || VALIDMOVE(i, j, i - 1, j + 1) || VALIDMOVE(i, j, i - 1, j - 1))
+                        playerHasMove = true;
+                }
+                if (board.getPiece(i, j) == "KB")
+                {
+                    if (KINGCaptureCheck(i, j) || KINGVALIDMOVE(i, j, i + 1, j + 1) || KINGVALIDMOVE(i, j, i + 1, j - 1) || KINGVALIDMOVE(i, j, i - 1, j + 1) || KINGVALIDMOVE(i, j, i - 1, j - 1))
+                        playerHasMove = true;
+                }
+            }
+        }
+        // Check if neither player nor computer has any move left
+        if (!playerHasMove || !computerHasMove)
+        {
+            return true; // End game
+        }
+        return false;
+    }
+    //DISPLAY THE RESULT OF THE GAME AT THE END
+    void printresult()
+    {
+        cout << "game over" << endl;
+        if (capturedPlayerPieces > capturedComputerPieces) {
+            cout << "Computer wins! computer captured more pieces." << endl;
+        }
+        else if (capturedComputerPieces > capturedPlayerPieces) {
+            cout << "player wins! player captured more pieces." << endl;
+        }
+        else {
+            cout << "It's a draw! Both sides captured equal number of pieces." << endl;
+        }
+    }
+};
+class Player {
+public:
+    static void playerMove(Game& game, int& fromRow, int& fromCol, int& toRow, int& toCol)
+    {
+        if (game.PieceIsKing(fromRow, fromCol, toRow, toCol))
+        {
+            if (game.KINGCaptureCheck(fromRow, fromCol)) {
+                game.MakeMove(fromRow, fromCol, toRow, toCol);
+                game.KINGCapture(fromRow, fromCol);
+            }
+            else if (game.KINGVALIDMOVE(fromRow, fromCol, toRow, toCol)) {
+                game.MakeMove(fromRow, fromCol, toRow, toCol);
+            }
+            else if (!game.KINGVALIDMOVE(fromRow, fromCol, toRow, toCol)|| game.board.getPiece(fromRow, fromCol)==".") {
+                cout << "INVALID INPUT" << endl;
+                cout << "Re enter the row and column of the piece you want to move: ";
+                cin >> fromRow >> fromCol;
+                cout << "Re enter the row and column where you want to move the piece: ";
+                cin >> toRow >> toCol;
+                playerMove(game, fromRow, fromCol, toRow, toCol);
+            }
+        }
+        else if (!game.PieceIsKing(fromRow, fromCol, toRow, toCol))
+        {
+            if (game.CaptureCheck(fromRow, fromCol)) {
+                game.MakeMove(fromRow, fromCol, toRow, toCol);
+                game.Capture(fromRow, fromCol);
+            }
+            else if (!game.CaptureCheck(fromRow, fromCol)) {
+                if (game.VALIDMOVE(fromRow, fromCol, toRow, toCol)) {
+                    if (game.PieceBecomesKing(fromRow, fromCol, toRow, toCol)) {
+                        game.MakeMove(fromRow, fromCol, toRow, toCol);
+                        cout << "Piece became KING! " << endl;
+                    }
+                    else
+                        game.MakeMove(fromRow, fromCol, toRow, toCol);
+                }
+                else if (!game.VALIDMOVE(fromRow, fromCol, toRow, toCol)||game.board.getPiece(fromRow, fromCol)==".") {
+                    cout << "INVALID INPUT" << endl;
+                    cout << "Re enter the row and column of the piece you want to move: ";
+                    cin >> fromRow >> fromCol;
+                    cout << "Re enter the row and column where you want to move the piece: ";
+                    cin >> toRow >> toCol;
+                    playerMove(game, fromRow, fromCol, toRow, toCol);
+                }
+            }
+        }
+    }
+};
+class Computer {
+public:
+    static void ComputerMove(Game& game, int& fromRow, int& fromCol, int& toRow, int& toCol) {
+        srand((double)time(NULL)); // random number generator
+        // Keep generating toRow and toCol until a valid move is found or all capture opportunities are exhausted
+        while (true) {
+            int fromRow = rand() % 8;
+            int fromCol = rand() % 8;
+            int toRow = rand() % 8;
+            int toCol = rand() % 8;
+            if (game.PieceIsKing(fromRow, fromCol, toRow, toCol) && game.board.getPiece(fromRow, fromCol) == "KW")
+            {
+                if (game.KINGCaptureCheck(fromRow, fromCol))
+                {
+                    game.KINGCapture(fromRow, fromCol);
+                    return;
+                }
+            }
+            else if (!game.PieceIsKing(fromRow, fromCol, toRow, toCol) && game.board.getPiece(fromRow, fromCol) == "W")
+            {
+                {
+                    if (game.CaptureCheck(fromRow, fromCol))
+                    {
+                        game.Capture(fromRow, fromCol);
+                        return;
+                    }
+                }
+            }
+            if (game.PieceIsKing(fromRow, fromCol, toRow, toCol) && game.board.getPiece(fromRow, fromCol) == "KW")
+            {
+                if (!game.KINGCaptureCheck(fromRow, fromCol))
+                {
+                    if (game.KINGVALIDMOVE(fromRow, fromCol, toRow, toCol))
+                    {
+                        game.MakeMove(fromRow, fromCol, toRow, toCol);
+                        cout << "Computer move: " << endl;
+                        cout << "from Row, from Column " << fromRow << " " << fromCol << endl;
+                        cout << "to row, to column " << toRow << " " << toCol << endl;
+                        return;
+                    }
+                }
+            }
+            if (!game.PieceIsKing(fromRow, fromCol, toRow, toCol) && game.board.getPiece(fromRow, fromCol) == "W")
+            {
+                if (!game.CaptureCheck(fromRow, fromCol))
+                {
+                    if (game.VALIDMOVE(fromRow, fromCol, toRow, toCol))
+                    {
+                        if (game.PieceBecomesKing(fromRow, fromCol, toRow, toCol))
+                        {
+                            game.MakeMove(fromRow, fromCol, toRow, toCol);
+                            cout << "Computer move: Piece became KING! " << endl;
+                            cout << "from Row, from Column " << fromRow << " " << fromCol << endl;
+                            cout << "to row, to column " << toRow << " " << toCol << endl;
+                            return;
+                        }
+                        // Piece did not become a King, so piece can do a simple move or capture:
+                        else
+                        {
+                            game.MakeMove(fromRow, fromCol, toRow, toCol);
+                            cout << "Computer move: " << endl;
+                            cout << "from Row, from Column " << fromRow << " " << fromCol << endl;
+                            cout << "to row, to column " << toRow << " " << toCol << endl;
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    }
+};
+int displayMainMenu() {
+    int choice;
+    cout << "Welcome to the Checkers Game." << endl;
+    cout << "Make a selection (1-3)" << endl;
+    cout << "1- Start the game" << endl;
+    cout << "2- Help" << endl;
+    cout << "3- Exit" << endl;
+    cin >> choice;
+    return choice;
+}
+int main() {
+    int choice, fromRow, fromCol, toRow, toCol;
+    do {
+        choice = displayMainMenu();
+        switch (choice) {
+        case 1: {
+            cout << "                   The Checkers Game                        \n" << endl;
+            cout << "Instructions:\n";
+            cout << "Player  is B on the checker board\n";
+            cout << "Computer is W on the checker board\n";
+            cout << "You will start the game. "<<endl;
+            cout <<"Remember to input position with rows first then columns. Example: 5 0 \n\n";
+            Game game;
+            game.printBoard();
+            bool playerTurn = true; // true for player, false for computer
+            // while (not endgmae)
+            while (true) {
+                if (playerTurn) {
+                    cout << "Enter the row and column of the piece you want to move: ";
+                    cin >> fromRow >> fromCol;
+                    cout << "Enter the row and column where you want to move the piece: ";
+                    cin >> toRow >> toCol;
+                    Player::playerMove(game, fromRow, fromCol, toRow, toCol);
+                    game.printBoard();
+                }
+                else {
+                    Computer::ComputerMove(game, fromRow, fromCol, toRow, toCol);
+                    game.printBoard();
+                }
+                playerTurn = !playerTurn; // Switch turns
+                if (game.IsEndGame()) {
+                    game.printresult();
+                    break;
+                }
+            }
+        }
+        case 2:
+                cout<<"HELP OPTION: "<<endl;
+                cout << "Welcome to the Checkers Game against the computer!!!!"<<endl;
+                cout << "You take turns with the computer in moving your pieces diagonally forward on the board. You will start the game by moving a piece of your choice. Remember to input position with rows first then columns with a space in between. The computer will automatically move its pieces after and the move will be displayed. Regular pieces can move diagonally forward one square, and kings can move diagonally forward or backward one square. "<<endl;
+                cout<< "A regular piece can capture diagonally forward by one square and kings can capture diagonally forward or backward one square. The computer automatically captures if it has the opportunity, so make sure to do the same ;). The goal is to capture all of the opponent's pieces. At the end of the game, the result will be displayed. Let the game begin! \n \n " << endl;
+            break;
+        case 3:
+            cout << "Exiting the game." << endl;
+            return 0;
+        default:
+            cout << "Enter a valid choice." << endl;
+            break;
+        }
+    } while (choice != 3); // Repeat until the user chooses to exit
+    return 0;
+}
